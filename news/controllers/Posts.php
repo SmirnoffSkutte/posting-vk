@@ -70,27 +70,43 @@ class Posts extends Controller
     private function sendPostInVk($post)
     {
         $rootDir = realpath($_SERVER["DOCUMENT_ROOT"]);
-        $group_id=Settings::get('vk_group_id');
-        $access_token=Settings::get('vk_token');
-        $vk_api_version=Settings::get('vk_api_version');
+        $group_id = Settings::get('vk_group_id');
+        $access_token = Settings::get('vk_token');
+        $vk_api_version = Settings::get('vk_api_version');
 
-        $imageSRCs=[];
-        $postMainImage=$rootDir.'/storage/app/media'.$post['image'];
-        $postIntroImages=$this->getPostIntroImages($post);
-        $postImages=$this->getPostImages($post);
-        array_unshift($imageSRCs,$postMainImage);
-        $imageSRCs=array_merge($imageSRCs,$postIntroImages,$postImages);
+        $imageSRCs = [];
+        $postMainImage=null;
+        if($post['image']){
+            $postMainImage = $rootDir . '/storage/app/media' . $post['image'];
+            array_unshift($imageSRCs, $postMainImage);
+        }
+        $postIntroImages = $this->getPostIntroImages($post);
+        $postImages = $this->getPostImages($post);
+        $imageSRCs = array_merge($imageSRCs, $postIntroImages, $postImages);
 
-        $title=strip_tags($post['title']);
-        $intro=strip_tags($post['introductory']);
-        $message=strip_tags($post['content']);
-        $postText=$title.PHP_EOL.$intro.PHP_EOL.$message;
+        $title = strip_tags($post['title']);
+        $intro = strip_tags($post['introductory']);
+        $message = strip_tags($post['content']);
+        $postText = $title . PHP_EOL . $intro . PHP_EOL . $message;
+        if (empty($imageSRCs))
+        {
+            $params = array(
+                'v' => $vk_api_version,
+                'access_token' => $access_token,
+                'owner_id' => '-' . $group_id,
+                'from_group' => '1',
+                'message' => $postText,
+            );
+            $res = file_get_contents('https://api.vk.com/method/wall.post?' . http_build_query($params));
+            $resArray = json_decode($res, true);
+            return $resArray['response']['post_id'];
+        }
 
-            // Получение сервера vk для загрузки изображения.
+        // Получение сервера vk для загрузки изображения.
         $server = file_get_contents('https://api.vk.com/method/photos.getWallUploadServer?group_id=' . $group_id . '&access_token=' . $access_token . '&v=' . $vk_api_version);
         $server = json_decode($server);
 
-        $savedImages=[];
+        $savedImages = [];
         if (!empty($server->response->upload_url)) {
             // Отправка изображений на сервер.
             foreach ($imageSRCs as $image) {
@@ -109,30 +125,31 @@ class Posts extends Controller
                 if (!empty($upload->server)) {
                     // Сохранение фото в группе.
                     $save = file_get_contents('https://api.vk.com/method/photos.saveWallPhoto?group_id=' . $group_id . '&server=' . $upload->server . '&photo=' . stripslashes($upload->photo) . '&hash=' . $upload->hash . '&access_token=' . $access_token . '&v=' . $vk_api_version);
-                    array_push($savedImages,$save);
+                    array_push($savedImages, $save);
                 }
             }
         }
         if (!empty($savedImages)) {
-            $savedImagesAttachments="";
-            foreach ($savedImages as $imageId){
-                $imageInfo=json_decode($imageId,true);
-                $savedImagesAttachments=$savedImagesAttachments.'photo'.$imageInfo['response'][0]['owner_id'].'_'.$imageInfo['response'][0]['id'].',';
+            $savedImagesAttachments = "";
+            foreach ($savedImages as $imageId) {
+                $imageInfo = json_decode($imageId, true);
+                $savedImagesAttachments = $savedImagesAttachments . 'photo' . $imageInfo['response'][0]['owner_id'] . '_' . $imageInfo['response'][0]['id'] . ',';
             }
             // Отправляем пост.
             $params = array(
-                'v'            => $vk_api_version,
+                'v' => $vk_api_version,
                 'access_token' => $access_token,
-                'owner_id'     => '-'.$group_id,
-                'from_group'   => '1',
-                'message'      => $postText,
-                'attachments'  => $savedImagesAttachments
+                'owner_id' => '-' . $group_id,
+                'from_group' => '1',
+                'message' => $postText,
+                'attachments' => $savedImagesAttachments
             );
 
-            $res=file_get_contents('https://api.vk.com/method/wall.post?' . http_build_query($params));
-            $resArray=json_decode($res,true);
+            $res = file_get_contents('https://api.vk.com/method/wall.post?' . http_build_query($params));
+            $resArray = json_decode($res, true);
             return $resArray['response']['post_id'];
         }
+//        trace_log($imageSRCs);
 
     }
 
@@ -143,17 +160,32 @@ class Posts extends Controller
         $access_token=Settings::get('vk_token');
         $vk_api_version=Settings::get('vk_api_version');
 
-        $imageSRCs=[];
-        $postMainImage=$rootDir.'/storage/app/media'.$post['image'];
-        $postIntroImages=$this->getPostIntroImages($post);
-        $postImages=$this->getPostImages($post);
-        array_unshift($imageSRCs,$postMainImage);
-        $imageSRCs=array_merge($imageSRCs,$postIntroImages,$postImages);
+        $imageSRCs = [];
+        $postMainImage=null;
+        if($post['image']){
+            $postMainImage = $rootDir . '/storage/app/media' . $post['image'];
+            array_unshift($imageSRCs, $postMainImage);
+        }
+        $postIntroImages = $this->getPostIntroImages($post);
+        $postImages = $this->getPostImages($post);
+        $imageSRCs = array_merge($imageSRCs, $postIntroImages, $postImages);
 
         $title=strip_tags($post['title']);
         $intro=strip_tags($post['introductory']);
         $message=strip_tags($post['content']);
         $postText=$title.PHP_EOL.$intro.PHP_EOL.$message;
+        if (empty($imageSRCs))
+        {
+            $params = array(
+                'v' => $vk_api_version,
+                'access_token' => $access_token,
+                'owner_id' => '-' . $group_id,
+                'from_group' => '1',
+                'message' => $postText,
+            );
+            $res = file_get_contents('https://api.vk.com/method/wall.post?' . http_build_query($params));
+            $resArray = json_decode($res, true);
+        }
         // Получение сервера vk для загрузки изображения.
         $server = file_get_contents('https://api.vk.com/method/photos.getWallUploadServer?group_id=' . $group_id . '&access_token=' . $access_token . '&v=' . $vk_api_version);
         $server = json_decode($server);
